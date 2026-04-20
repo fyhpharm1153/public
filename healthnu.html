@@ -93,11 +93,15 @@
         let printFontSize = 11;
 
         async function fetchData() {
-            const response = await fetch(GOOGLE_SHEET_API);
-            allProducts = await response.json();
-            renderCategories();
-            renderSubCategories();
-            renderProducts(allProducts);
+            try {
+                const response = await fetch(GOOGLE_SHEET_API);
+                allProducts = await response.json();
+                renderCategories();
+                renderSubCategories(); // 初始化渲染
+                renderProducts(allProducts);
+            } catch (e) {
+                console.error("資料載入出錯", e);
+            }
         }
 
         function renderProducts(data) {
@@ -123,35 +127,36 @@
             }).join('');
         }
 
-        // 核心邏輯更新：動態過濾次分類按鈕
+        // 修改後的次分類渲染邏輯：只顯示目前大分類下的標籤
         function renderSubCategories() {
-            // 1. 根據大分類過濾產品範圍
-            const currentScope = activeCategory === '全部' 
+            // 1. 根據目前的大分類，過濾出暫存的產品列表
+            const productsInScope = (activeCategory === '全部') 
                 ? allProducts 
                 : allProducts.filter(p => p.大分類 === activeCategory);
 
-            // 2. 從範圍內的產品提取「次分類」
-            const tags = [...new Set(currentScope.flatMap(p => 
-                p.次分類 ? p.次分類.split(',').map(s => s.trim()) : []
-            ))].filter(Boolean);
+            // 2. 從這些產品中提取唯一的次分類標籤
+            const tags = [...new Set(
+                productsInScope.flatMap(p => p.次分類 ? p.次分類.split(',').map(s => s.trim()) : [])
+            )].filter(Boolean);
 
             // 3. 渲染按鈕
             document.getElementById('subCategoryCloud').innerHTML = tags.map(t => 
                 `<span onclick="toggleSubCat('${t}')" class="subcat-pill ${activeSubCat === t ? 'active' : ''}">${t}</span>`
             ).join('');
 
-            // 4. 防呆：若切換大分類後原本選取的次分類消失了，則重置它
+            // 4. 防呆：如果換分類後原本選取的次分類不存在，則重設為 null
             if (activeSubCat && !tags.includes(activeSubCat)) {
                 activeSubCat = null;
                 filterData();
             }
         }
 
+        // 修改後的設定分類函式
         function setCategory(cat) { 
             activeCategory = cat; 
-            activeSubCat = null; // 切換大分類時，重設次分類狀態
+            activeSubCat = null; // 切換大分類時，務必清除舊的次分類選擇
             renderCategories(); 
-            renderSubCategories(); // 同步更新按鈕
+            renderSubCategories(); // 重新整理次分類按鈕（這行解決了您的問題）
             filterData(); 
         }
 
