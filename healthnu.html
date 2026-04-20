@@ -323,7 +323,7 @@ async function sendEmailAction() {
             </td>
         </tr>`).join('');
     
-    alert("正在連線伺服器寄信...");
+    alert("已傳送信件...");
 
     try {
         await fetch(GOOGLE_SHEET_API, { 
@@ -332,7 +332,7 @@ async function sendEmailAction() {
             headers: { 'Content-Type': 'text/plain' }, // 使用 text/plain 最保險
             body: JSON.stringify({ action: 'sendEmail', email: email, tableHtml: tableHtml }) 
         });
-        alert("寄件指令已送出！請確認收件匣（若沒收到請檢查垃圾郵件）。");
+        alert("請確認收件匣（若沒收到請檢查垃圾郵件）。");
     } catch (e) { 
         alert("網路錯誤，請稍後再試"); 
     }
