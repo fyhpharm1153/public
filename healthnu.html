@@ -11,12 +11,10 @@
         html { font-size: var(--base-font-size); }
         body { font-family: 'Noto Sans TC', sans-serif; background: #f1f5f9; transition: font-size 0.2s; padding-bottom: 100px; }
         
-        /* Bento Card 樣式 */
         .bento-card { background: white; border-radius: 1.5rem; border: 1px solid #e2e8f0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); height: 100%; display: flex; flex-direction: column; position: relative; }
         .bento-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); border-color: #3b82f6; }
         .glass-nav { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(226, 232, 240, 0.8); }
         
-        /* 次分類標籤樣式 */
         .subcat-pill { font-size: 0.75rem; padding: 4px 12px; border-radius: 999px; background: white; color: #64748b; font-weight: 700; cursor: pointer; transition: 0.2s; border: 1px solid #e2e8f0; }
         .subcat-pill.active { background: #3b82f6; color: white; border-color: #3b82f6; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3); }
         
@@ -56,12 +54,12 @@
 
         <main class="max-w-7xl mx-auto p-4 md:p-8">
             <div class="mb-8 space-y-4">
-                <input type="text" id="searchInput" oninput="filterData()" placeholder="搜尋品名、代碼、功效..." class="w-full p-5 rounded-2xl border-2 border-white bg-white shadow-xl focus:border-blue-500 focus:outline-none text-lg">
+                <input type="text" id="searchInput" oninput="filterData()" placeholder="搜尋品名、代碼、功效、關鍵字..." class="w-full p-5 rounded-2xl border-2 border-white bg-white shadow-xl focus:border-blue-500 focus:outline-none text-lg">
                 
                 <div id="categoryFilter" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
                 
                 <div class="bg-white/60 p-5 rounded-2xl border border-white shadow-sm">
-                    <p class="text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest">目前分類下的次分類</p>
+                    <p class="text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest">第二層：次分類篩選</p>
                     <div id="subCategoryCloud" class="flex flex-wrap gap-2"></div>
                 </div>
             </div>
@@ -97,7 +95,7 @@
         let currentFontSize = 16;
         let printFontSize = 11;
 
-        // 輔助函式：清洗資料 (去引號、去空白)
+        // 深度清洗：處理 CSV 匯入的引號與空白
         function clean(str) {
             if (!str) return "";
             return String(str).replace(/["']/g, "").trim();
@@ -108,33 +106,51 @@
                 const response = await fetch(GOOGLE_SHEET_API);
                 const rawData = await response.json();
                 
-                // 讀取時立即清洗所有關鍵欄位
+                // 初始化資料清洗
                 allProducts = rawData.map(item => {
                     const p = {};
-                    Object.keys(item).forEach(key => { p[clean(key)] = clean(item[key]); });
+                    Object.keys(item).forEach(key => {
+                        p[clean(key)] = clean(item[key]);
+                    });
                     return p;
                 });
 
                 renderCategories();
-                renderSubCategories(); // IDEA 2 核心：初始計算
-                renderProducts(allProducts);
+                updateSubCategoryUI(); // 根據初始狀態渲染次分類
+                filterData();
             } catch (e) {
                 console.error("資料載入失敗", e);
             }
         }
 
-        // --- IDEA 2 核心邏輯：生存過濾 ---
-        function renderSubCategories() {
+        // 第一層渲染：大分類按鈕
+        function renderCategories() {
+            const cats = ['全部', ...new Set(allProducts.map(p => p.大分類).filter(Boolean))];
+            document.getElementById('categoryFilter').innerHTML = cats.map(c => 
+                `<button onclick="setCategory('${c}')" class="px-6 py-2 rounded-full border font-bold whitespace-nowrap ${c === activeCategory ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600'}">${c}</button>`).join('');
+        }
+
+        // 設定第一層分類
+        function setCategory(cat) {
+            activeCategory = cat;
+            activeSubCat = null; // 重置第二層選擇
+            renderCategories();
+            updateSubCategoryUI(); // 關鍵：更新第二層可用的按鈕
+            filterData();
+        }
+
+        // 更新第二層 UI：只顯示目前大分類中存在的次分類
+        function updateSubCategoryUI() {
             const cloud = document.getElementById('subCategoryCloud');
             
-            // 1. 取得目前大分類下的「生存產品」
-            const survivalProducts = (activeCategory === '全部') 
+            // 找出目前大分類下的產品
+            const scopeProducts = (activeCategory === '全部') 
                 ? allProducts 
                 : allProducts.filter(p => p.大分類 === activeCategory);
 
-            // 2. 從這些產品中提取現有的次分類
+            // 提取次分類標籤
             const subCatSet = new Set();
-            survivalProducts.forEach(p => {
+            scopeProducts.forEach(p => {
                 if (p.次分類) {
                     p.次分類.split(/[，,]/).forEach(s => {
                         const sClean = clean(s);
@@ -143,53 +159,43 @@
                 }
             });
 
-            const sortedSubCats = Array.from(subCatSet).sort();
-
-            // 3. 渲染按鈕
-            cloud.innerHTML = sortedSubCats.map(s => 
+            const sortedSubs = Array.from(subCatSet).sort();
+            cloud.innerHTML = sortedSubs.map(s => 
                 `<span onclick="toggleSubCat('${s}')" class="subcat-pill ${activeSubCat === s ? 'active' : ''}">${s}</span>`
             ).join('');
-
-            // 4. 防呆：如果切換大分類後原本選的次分類不存在，自動取消選取
-            if (activeSubCat && !subCatSet.has(activeSubCat)) {
-                activeSubCat = null;
-                filterData();
-            }
-        }
-
-        function setCategory(cat) {
-            activeCategory = cat;
-            activeSubCat = null; // 切換大分類必清空次分類選取
-            renderCategories();
-            renderSubCategories(); // 重新計算標籤
-            filterData();
         }
 
         function toggleSubCat(tag) {
             activeSubCat = (activeSubCat === tag) ? null : tag;
-            renderSubCategories(); // 更新高亮狀態
+            updateSubCategoryUI();
             filterData();
         }
 
+        // 核心過濾功能
         function filterData() {
             const query = document.getElementById('searchInput').value.toLowerCase();
+            
             const filtered = allProducts.filter(p => {
-                const mQ = !query || p.名稱.toLowerCase().includes(query) || p.代碼.toLowerCase().includes(query);
-                const mC = activeCategory === '全部' || p.大分類 === activeCategory;
-                let mS = true;
+                // 1. 第一層篩選 (大分類)
+                const matchesCat = activeCategory === '全部' || p.大分類 === activeCategory;
+                
+                // 2. 第二層篩選 (次分類)
+                let matchesSub = true;
                 if (activeSubCat) {
                     const subs = p.次分類 ? p.次分類.split(/[，,]/).map(s => clean(s)) : [];
-                    mS = subs.includes(activeSubCat);
+                    matchesSub = subs.includes(activeSubCat);
                 }
-                return mQ && mC && mS;
-            });
-            renderProducts(filtered);
-        }
 
-        function renderCategories() {
-            const cats = ['全部', ...new Set(allProducts.map(p => p.大分類).filter(Boolean))];
-            document.getElementById('categoryFilter').innerHTML = cats.map(c => 
-                `<button onclick="setCategory('${c}')" class="px-6 py-2 rounded-full border font-bold whitespace-nowrap ${c === activeCategory ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600'}">${c}</button>`).join('');
+                // 3. 搜尋功能：包含 名稱、代碼、保健效果、關鍵字欄位、適合對象
+                const searchContent = [
+                    p.名稱, p.代碼, p.主要保健效果, p.關鍵字, p.適合對象, p.主要成分
+                ].join(' ').toLowerCase();
+                const matchesQuery = !query || searchContent.includes(query);
+
+                return matchesCat && matchesSub && matchesQuery;
+            });
+
+            renderProducts(filtered);
         }
 
         function renderProducts(data) {
@@ -215,7 +221,7 @@
             }).join('');
         }
 
-        // --- 功能功能保留：比較清單、列印、Email ---
+        // --- 功能模組：清單、列印、Email ---
 
         function toggleCart(id) { 
             if (cart.has(id)) cart.delete(id); else cart.add(id); 
@@ -224,7 +230,7 @@
         }
 
         function toggleCartModal() {
-            if (cart.size === 0) { alert("清單是空的"); return; }
+            if (cart.size === 0) { alert("目前清單是空的"); return; }
             const items = allProducts.filter(p => cart.has(p.代碼));
             document.getElementById('modalContent').innerHTML = `
                 <div class="flex justify-between items-center mb-6">
@@ -260,15 +266,15 @@
                 </tr>`).join('');
 
             document.getElementById('printArea').innerHTML = `
-                <div class="no-print flex justify-between items-center p-4" style="background:#f1f5f9; border-bottom:1px solid #e2e8f0;">
-                    <button onclick="closePrintView()" class="bg-slate-500 text-white px-6 py-2 rounded-xl font-bold">← 返回目錄</button>
-                    <div class="flex items-center gap-3 bg-white p-2 rounded-xl border">
-                        <span class="text-xs font-bold text-slate-400 px-2">列印字體:</span>
-                        <button onclick="adjustPrintFont(-1)" class="w-8 h-8 border rounded font-bold">A-</button>
+                <div class="no-print flex justify-between items-center p-4 bg-slate-100 border-b">
+                    <button onclick="closePrintView()" class="bg-slate-500 text-white px-6 py-2 rounded-xl">← 返回</button>
+                    <div class="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border">
+                        <span class="text-xs font-bold text-slate-400">列印字級:</span>
+                        <button onclick="adjustPrintFont(-1)" class="w-8 h-8 border rounded">A-</button>
                         <span id="p-indicator" class="font-black text-blue-600">${printFontSize}px</span>
-                        <button onclick="adjustPrintFont(1)" class="w-8 h-8 border rounded font-bold">A+</button>
+                        <button onclick="adjustPrintFont(1)" class="w-8 h-8 border rounded">A+</button>
                     </div>
-                    <button onclick="window.print()" class="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold">執行列印 / PDF</button>
+                    <button onclick="window.print()" class="bg-blue-600 text-white px-6 py-2 rounded-xl">確認列印</button>
                 </div>
                 <div style="padding: 20px;">
                     <h1 style="text-align:center; font-size:18px; font-weight:900; margin-bottom:10px;">營養補充品產品比較對照表</h1>
@@ -317,7 +323,7 @@
             const p = allProducts.find(x => x.代碼 === id);
             document.getElementById('modalContent').innerHTML = `
                 <div class="flex flex-col lg:flex-row gap-10 text-left">
-                    <div class="lg:w-1/3"><img src="${IMAGE_PREFIX}${p.圖片ID}&sz=w800" class="w-full bg-slate-50 rounded-3xl p-6 shadow-inner"></div>
+                    <div class="lg:w-1/3"><img src="${IMAGE_PREFIX}${p.圖片ID}&sz=w800" class="w-full bg-slate-50 rounded-3xl p-6"></div>
                     <div class="lg:w-2/3">
                         <span class="text-blue-500 font-black text-xs uppercase">${p.代碼} | ${p.大分類}</span>
                         <h2 class="text-3xl font-black text-slate-900 mb-6">${p.名稱}</h2>
