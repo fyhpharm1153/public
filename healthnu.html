@@ -93,11 +93,15 @@
         let printFontSize = 11;
 
         async function fetchData() {
-            const response = await fetch(GOOGLE_SHEET_API);
-            allProducts = await response.json();
-            renderCategories();
-            renderSubCategories();
-            renderProducts(allProducts);
+            try {
+                const response = await fetch(GOOGLE_SHEET_API);
+                allProducts = await response.json();
+                renderCategories();
+                renderSubCategories(); // 初始化時就根據選取的「全部」來渲染
+                renderProducts(allProducts);
+            } catch (e) {
+                console.error("資料載入失敗", e);
+            }
         }
 
         function renderProducts(data) {
@@ -123,7 +127,44 @@
             }).join('');
         }
 
-        function toggleSubCat(tag) { activeSubCat = (activeSubCat === tag) ? null : tag; renderSubCategories(); filterData(); }
+        // 修改：動態根據目前的大分類渲染次分類
+        function renderSubCategories() {
+            // 1. 先決定範圍：目前的產品集
+            const filteredProductsByCategory = (activeCategory === '全部') 
+                ? allProducts 
+                : allProducts.filter(p => p.大分類 === activeCategory);
+
+            // 2. 提取這些產品中有的次分類標籤
+            const tags = [...new Set(
+                filteredProductsByCategory.flatMap(p => p.次分類 ? p.次分類.split(',').map(s => s.trim()) : [])
+            )].filter(Boolean);
+
+            // 3. 渲染
+            document.getElementById('subCategoryCloud').innerHTML = tags.map(t => 
+                `<span onclick="toggleSubCat('${t}')" class="subcat-pill ${activeSubCat === t ? 'active' : ''}">${t}</span>`
+            ).join('');
+
+            // 4. 防呆：如果換分類後，原本選取的次分類已不存在，則重置它
+            if (activeSubCat && !tags.includes(activeSubCat)) {
+                activeSubCat = null;
+                filterData();
+            }
+        }
+
+        function setCategory(cat) { 
+            activeCategory = cat; 
+            activeSubCat = null; // 切換大分類時，重設次分類狀態
+            renderCategories(); 
+            renderSubCategories(); // 重新整理次分類按鈕清單
+            filterData(); 
+        }
+
+        function toggleSubCat(tag) { 
+            activeSubCat = (activeSubCat === tag) ? null : tag; 
+            renderSubCategories(); 
+            filterData(); 
+        }
+
         function filterData() {
             const query = document.getElementById('searchInput').value.toLowerCase();
             const filtered = allProducts.filter(p => {
@@ -140,11 +181,7 @@
             document.getElementById('categoryFilter').innerHTML = cats.map(c => 
                 `<button onclick="setCategory('${c}')" class="px-6 py-2 rounded-full border font-bold whitespace-nowrap ${c === activeCategory ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600'}">${c}</button>`).join('');
         }
-        function setCategory(cat) { activeCategory = cat; renderCategories(); filterData(); }
-        function renderSubCategories() {
-            const tags = [...new Set(allProducts.flatMap(p => p.次分類 ? p.次分類.split(',').map(s => s.trim()) : []))].filter(Boolean);
-            document.getElementById('subCategoryCloud').innerHTML = tags.map(t => `<span onclick="toggleSubCat('${t}')" class="subcat-pill ${activeSubCat === t ? 'active' : ''}">${t}</span>`).join('');
-        }
+
         function toggleCart(id) { if (cart.has(id)) cart.delete(id); else cart.add(id); document.getElementById('cartCount').innerText = cart.size; filterData(); }
 
         function adjustPrintFont(delta) {
@@ -155,7 +192,6 @@
             if(indicator) indicator.innerText = printFontSize + 'px';
         }
 
-        // --- 核心更新：在品名下方加入小圖片 ---
         function generatePrintView() {
             const items = allProducts.filter(p => cart.has(p.代碼));
             const tableRows = items.map(p => {
@@ -287,6 +323,7 @@
 
         function closeModal() { document.getElementById('modal').classList.add('hidden'); }
         function adjustFont(delta) { currentFontSize = Math.min(Math.max(currentFontSize + delta, 12), 32); document.documentElement.style.setProperty('--base-font-size', currentFontSize + 'px'); }
+        
         window.onload = fetchData;
     </script>
 </body>
