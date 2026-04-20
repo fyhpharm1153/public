@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>醫院營養補充品手冊</title>
+    <title>醫院專業營養補充品手冊</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
@@ -55,15 +55,12 @@
         <main class="max-w-7xl mx-auto p-4 md:p-8">
             <div class="mb-8 space-y-4">
                 <input type="text" id="searchInput" oninput="filterData()" placeholder="搜尋品名、代碼、功效、關鍵字..." class="w-full p-5 rounded-2xl border-2 border-white bg-white shadow-xl focus:border-blue-500 focus:outline-none text-lg">
-                
                 <div id="categoryFilter" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
-                
                 <div class="bg-white/60 p-5 rounded-2xl border border-white shadow-sm">
                     <p class="text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest">第二層：次分類篩選</p>
                     <div id="subCategoryCloud" class="flex flex-wrap gap-2"></div>
                 </div>
             </div>
-
             <div id="productGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
         </main>
 
@@ -95,7 +92,6 @@
         let currentFontSize = 16;
         let printFontSize = 11;
 
-        // 深度清洗：處理 CSV 匯入的引號與空白
         function clean(str) {
             if (!str) return "";
             return String(str).replace(/["']/g, "").trim();
@@ -105,50 +101,34 @@
             try {
                 const response = await fetch(GOOGLE_SHEET_API);
                 const rawData = await response.json();
-                
-                // 初始化資料清洗
                 allProducts = rawData.map(item => {
                     const p = {};
-                    Object.keys(item).forEach(key => {
-                        p[clean(key)] = clean(item[key]);
-                    });
+                    Object.keys(item).forEach(key => { p[clean(key)] = clean(item[key]); });
                     return p;
                 });
-
                 renderCategories();
-                updateSubCategoryUI(); // 根據初始狀態渲染次分類
+                updateSubCategoryUI();
                 filterData();
-            } catch (e) {
-                console.error("資料載入失敗", e);
-            }
+            } catch (e) { console.error("資料載入失敗", e); }
         }
 
-        // 第一層渲染：大分類按鈕
         function renderCategories() {
             const cats = ['全部', ...new Set(allProducts.map(p => p.大分類).filter(Boolean))];
             document.getElementById('categoryFilter').innerHTML = cats.map(c => 
                 `<button onclick="setCategory('${c}')" class="px-6 py-2 rounded-full border font-bold whitespace-nowrap ${c === activeCategory ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600'}">${c}</button>`).join('');
         }
 
-        // 設定第一層分類
         function setCategory(cat) {
             activeCategory = cat;
-            activeSubCat = null; // 重置第二層選擇
+            activeSubCat = null;
             renderCategories();
-            updateSubCategoryUI(); // 關鍵：更新第二層可用的按鈕
+            updateSubCategoryUI();
             filterData();
         }
 
-        // 更新第二層 UI：只顯示目前大分類中存在的次分類
         function updateSubCategoryUI() {
             const cloud = document.getElementById('subCategoryCloud');
-            
-            // 找出目前大分類下的產品
-            const scopeProducts = (activeCategory === '全部') 
-                ? allProducts 
-                : allProducts.filter(p => p.大分類 === activeCategory);
-
-            // 提取次分類標籤
+            const scopeProducts = (activeCategory === '全部') ? allProducts : allProducts.filter(p => p.大分類 === activeCategory);
             const subCatSet = new Set();
             scopeProducts.forEach(p => {
                 if (p.次分類) {
@@ -158,11 +138,8 @@
                     });
                 }
             });
-
             const sortedSubs = Array.from(subCatSet).sort();
-            cloud.innerHTML = sortedSubs.map(s => 
-                `<span onclick="toggleSubCat('${s}')" class="subcat-pill ${activeSubCat === s ? 'active' : ''}">${s}</span>`
-            ).join('');
+            cloud.innerHTML = sortedSubs.map(s => `<span onclick="toggleSubCat('${s}')" class="subcat-pill ${activeSubCat === s ? 'active' : ''}">${s}</span>`).join('');
         }
 
         function toggleSubCat(tag) {
@@ -171,30 +148,19 @@
             filterData();
         }
 
-        // 核心過濾功能
         function filterData() {
             const query = document.getElementById('searchInput').value.toLowerCase();
-            
             const filtered = allProducts.filter(p => {
-                // 1. 第一層篩選 (大分類)
                 const matchesCat = activeCategory === '全部' || p.大分類 === activeCategory;
-                
-                // 2. 第二層篩選 (次分類)
                 let matchesSub = true;
                 if (activeSubCat) {
                     const subs = p.次分類 ? p.次分類.split(/[，,]/).map(s => clean(s)) : [];
                     matchesSub = subs.includes(activeSubCat);
                 }
-
-                // 3. 搜尋功能：包含 名稱、代碼、保健效果、關鍵字欄位、適合對象
-                const searchContent = [
-                    p.名稱, p.代碼, p.主要保健效果, p.關鍵字, p.適合對象, p.主要成分
-                ].join(' ').toLowerCase();
+                const searchContent = [p.名稱, p.代碼, p.主要保健效果, p.關鍵字, p.適合對象, p.主要成分].join(' ').toLowerCase();
                 const matchesQuery = !query || searchContent.includes(query);
-
                 return matchesCat && matchesSub && matchesQuery;
             });
-
             renderProducts(filtered);
         }
 
@@ -221,8 +187,6 @@
             }).join('');
         }
 
-        // --- 功能模組：清單、列印、Email ---
-
         function toggleCart(id) { 
             if (cart.has(id)) cart.delete(id); else cart.add(id); 
             document.getElementById('cartCount').innerText = cart.size; 
@@ -230,7 +194,7 @@
         }
 
         function toggleCartModal() {
-            if (cart.size === 0) { alert("目前清單是空的"); return; }
+            if (cart.size === 0) { alert("清單是空的"); return; }
             const items = allProducts.filter(p => cart.has(p.代碼));
             document.getElementById('modalContent').innerHTML = `
                 <div class="flex justify-between items-center mb-6">
@@ -251,20 +215,10 @@
             const items = allProducts.filter(p => cart.has(p.代碼));
             const tableRows = items.map(p => `
                 <tr>
-                    <td>
-                        <div style="font-weight: bold;">${p.代碼}<br>${p.名稱}</div>
-                        <img src="${IMAGE_PREFIX}${p.圖片ID}&sz=w400" class="print-img">
-                    </td>
-                    <td style="text-align:center;">
-                        <div style="color:#2563eb; font-weight:bold;">$${p.民眾價}</div>
-                        <div style="color:#dc2626; font-weight:bold;">$${p.員眷價}</div>
-                    </td>
-                    <td>${p.主要成分}</td>
-                    <td>${p.食用方法}</td>
-                    <td>${p.適合對象 || p.適用對象}</td>
-                    <td>${p.內容包裝規格}</td>
+                    <td><div style="font-weight: bold;">${p.代碼}<br>${p.名稱}</div><img src="${IMAGE_PREFIX}${p.圖片ID}&sz=w400" class="print-img"></td>
+                    <td style="text-align:center;"><div style="color:#2563eb; font-weight:bold;">$${p.民眾價}</div><div style="color:#dc2626; font-weight:bold;">$${p.員眷價}</div></td>
+                    <td>${p.主要成分}</td><td>${p.食用方法}</td><td>${p.適合對象 || p.適用對象}</td><td>${p.內容包裝規格}</td>
                 </tr>`).join('');
-
             document.getElementById('printArea').innerHTML = `
                 <div class="no-print flex justify-between items-center p-4 bg-slate-100 border-b">
                     <button onclick="closePrintView()" class="bg-slate-500 text-white px-6 py-2 rounded-xl">← 返回</button>
@@ -277,11 +231,9 @@
                     <button onclick="window.print()" class="bg-blue-600 text-white px-6 py-2 rounded-xl">確認列印</button>
                 </div>
                 <div style="padding: 20px;">
-                    <h1 style="text-align:center; font-size:18px; font-weight:900; margin-bottom:10px;">營養補充品產品比較對照表</h1>
+                    <h1 style="text-align:center; font-size:18px; font-weight:900; margin-bottom:10px;">營養補充品比較對照表</h1>
                     <table class="print-table" style="width:100%; border-collapse:collapse;">
-                        <thead style="background:#f8fafc">
-                            <tr><th>品名/代碼</th><th>價格(民/員)</th><th>主要成分</th><th>用法</th><th>對象</th><th>規格</th></tr>
-                        </thead>
+                        <thead><tr><th>品名/代碼</th><th>價格(民/員)</th><th>主要成分</th><th>用法</th><th>對象</th><th>規格</th></tr></thead>
                         <tbody style="font-size: var(--print-font-size);">${tableRows}</tbody>
                     </table>
                 </div>`;
@@ -290,26 +242,24 @@
             closeModal();
         }
 
-        function closePrintView() {
-            document.getElementById('mainApp').style.display = 'block';
-            document.getElementById('printArea').classList.add('hidden');
-        }
-
+        function closePrintView() { document.getElementById('mainApp').style.display = 'block'; document.getElementById('printArea').classList.add('hidden'); }
         function adjustPrintFont(delta) {
             printFontSize = Math.min(Math.max(printFontSize + delta, 8), 24);
             document.documentElement.style.setProperty('--print-font-size', printFontSize + 'px');
             document.getElementById('p-indicator').innerText = printFontSize + 'px';
         }
 
+        // --- 核心修正：寄送 Email 增加適合對象與規格 ---
         async function sendEmailAction() {
             const email = prompt("請輸入收件人信箱：");
             if (!email || !email.includes('@')) return;
             const items = allProducts.filter(p => cart.has(p.代碼));
             const tableHtml = items.map(p => `
                 <tr>
-                    <td style="padding:10px; border:1px solid #ddd;"><b>${p.代碼}</b><br>${p.名稱}</td>
-                    <td style="padding:10px; border:1px solid #ddd; text-align:center; color:#2563eb;"><b>$${p.民眾價}</b><br><span style="color:#dc2626">$${p.員眷價}</span></td>
-                    <td style="padding:10px; border:1px solid #ddd; font-size:12px;"><b>成分：</b>${p.主要成分}<br><b>用法：</b>${p.食用方法}</td>
+                    <td style="padding:10px; border:1px solid #ddd; width:20%;"><b>${p.代碼}</b><br>${p.名稱}</td>
+                    <td style="padding:10px; border:1px solid #ddd; text-align:center; width:15%; color:#2563eb;"><b>$${p.民眾價}</b><br><span style="color:#dc2626">$${p.員眷價}</span></td>
+                    <td style="padding:10px; border:1px solid #ddd; font-size:12px; width:30%;"><b>成分：</b>${p.主要成分}<br><b>用法：</b>${p.食用方法}</td>
+                    <td style="padding:10px; border:1px solid #ddd; font-size:12px; width:35%;"><b>對象：</b>${p.適合對象 || p.適用對象}<br><b>規格：</b>${p.內容包裝規格}</td>
                 </tr>`).join('');
             
             alert("發送中...");
