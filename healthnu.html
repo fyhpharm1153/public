@@ -301,37 +301,39 @@
             document.getElementById('p-indicator').innerText = printFontSize + 'px';
         }
 
-        async function sendEmailAction() {
-            const email = prompt("請輸入收件人信箱：");
-            if (!email || !email.includes('@')) return;
-            const items = allProducts.filter(p => cart.has(p.代碼));
-            
-            // 重新定義 tableHtml，移除價格欄位
-            const tableHtml = items.map(p => `
-                <tr>
-                    <td style="padding:12px; border:1px solid #ddd; width:30%;"><b>${p.代碼}</b><br>${p.名稱}</td>
-                    <td style="padding:12px; border:1px solid #ddd; font-size:12px; width:40%;">
-                        <div style="margin-bottom:6px;"><b>成分：</b>${p.主要成分}</div>
-                        <div><b>用法：</b>${p.食用方法}</div>
-                    </td>
-                    <td style="padding:12px; border:1px solid #ddd; font-size:12px; width:30%;">
-                        <div style="margin-bottom:6px;"><b>對象：</b>${p.適合對象 || p.適用對象 || "一般大眾"}</div>
-                        <div><b>規格：</b>${p.內容包裝規格}</div>
-                    </td>
-                </tr>`).join('');
-            
-            alert("發送中...");
-            try {
-                await fetch(GOOGLE_SHEET_API, { 
-                    method: 'POST', 
-                    mode: 'no-cors', 
-                    body: JSON.stringify({ action: 'sendEmail', email: email, tableHtml: tableHtml }) 
-                });
-                alert("已成功送出請求，請確認收件匣。");
-            } catch (e) { 
-                alert("發送失敗，請稍後再試"); 
-            }
-        }
+       async function sendEmailAction() {
+    const email = prompt("請輸入收件人信箱：");
+    if (!email || !email.includes('@')) return;
+    const items = allProducts.filter(p => cart.has(p.代碼));
+    
+    // 生成給郵件用的表格內容 (共 4 欄)
+    const tableHtml = items.map(p => `
+        <tr style="border-bottom: 1px solid #eee;">
+            <td style="padding:12px; border:1px solid #ddd; width:25%;"><b>${p.代碼}</b><br>${p.名稱}</td>
+            <td style="padding:12px; border:1px solid #ddd; font-size:12px; width:35%;">
+                <div style="margin-bottom:6px;"><b>成分：</b>${p.主要成分}</div>
+                <div><b>用法：</b>${p.食用方法}</div>
+            </td>
+            <td style="padding:12px; border:1px solid #ddd; font-size:12px; width:20%; text-align:center;">
+                ${p.內容包裝規格}
+            </td>
+            <td style="padding:12px; border:1px solid #ddd; font-size:12px; width:20%;">
+                ${p.適合對象 || p.適用對象 || "一般大眾"}
+            </td>
+        </tr>`).join('');
+    
+    alert("發送中...");
+    try {
+        await fetch(GOOGLE_SHEET_API, { 
+            method: 'POST', 
+            mode: 'no-cors', 
+            body: JSON.stringify({ action: 'sendEmail', email: email, tableHtml: tableHtml }) 
+        });
+        alert("已成功送出請求，請確認收件匣。");
+    } catch (e) { 
+        alert("發送失敗"); 
+    }
+}
 
         function showDetail(id) {
             const p = allProducts.find(x => x.代碼 === id);
