@@ -11,13 +11,18 @@
         html { font-size: var(--base-font-size); }
         body { font-family: 'Noto Sans TC', sans-serif; background: #f1f5f9; transition: font-size 0.2s; padding-bottom: 100px; }
         
+        /* Bento Card 樣式 */
         .bento-card { background: white; border-radius: 1.5rem; border: 1px solid #e2e8f0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); height: 100%; display: flex; flex-direction: column; position: relative; }
         .bento-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); border-color: #3b82f6; }
         .glass-nav { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(226, 232, 240, 0.8); }
+        
+        /* 次分類標籤樣式 */
         .subcat-pill { font-size: 0.75rem; padding: 4px 12px; border-radius: 999px; background: white; color: #64748b; font-weight: 700; cursor: pointer; transition: 0.2s; border: 1px solid #e2e8f0; }
         .subcat-pill.active { background: #3b82f6; color: white; border-color: #3b82f6; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3); }
+        
         .card-label { font-size: 0.7rem; padding: 1px 8px; border-radius: 4px; background: #eff6ff; color: #1d4ed8; font-weight: 700; margin-right: 4px; margin-bottom: 4px; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
+        
         .add-cart-btn { position: absolute; top: 1.25rem; right: 1.25rem; z-index: 20; background: white; border: 1px solid #e2e8f0; padding: 0.4rem 0.8rem; border-radius: 10px; font-size: 0.75rem; font-weight: bold; transition: 0.2s; }
         .add-cart-btn.added { background: #1e293b; color: white; }
         .cart-float { position: fixed; bottom: 2rem; right: 2rem; z-index: 50; }
@@ -51,15 +56,16 @@
 
         <main class="max-w-7xl mx-auto p-4 md:p-8">
             <div class="mb-8 space-y-4">
-                <input type="text" id="searchInput" oninput="filterData()" placeholder="搜尋品名、代碼..." class="w-full p-5 rounded-2xl border-2 border-white bg-white shadow-xl focus:border-blue-500 focus:outline-none text-lg">
+                <input type="text" id="searchInput" oninput="filterData()" placeholder="搜尋品名、代碼、功效..." class="w-full p-5 rounded-2xl border-2 border-white bg-white shadow-xl focus:border-blue-500 focus:outline-none text-lg">
                 
                 <div id="categoryFilter" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
                 
                 <div class="bg-white/60 p-5 rounded-2xl border border-white shadow-sm">
-                    <p class="text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest">次分類標籤篩選</p>
+                    <p class="text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest">目前分類下的次分類</p>
                     <div id="subCategoryCloud" class="flex flex-wrap gap-2"></div>
                 </div>
             </div>
+
             <div id="productGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
         </main>
 
@@ -88,13 +94,13 @@
         let activeCategory = '全部';
         let activeSubCat = null;
         let cart = new Set();
-        let categoryMap = {}; // 存放大分類與次分類的關係
         let currentFontSize = 16;
         let printFontSize = 11;
 
-        // 深度清洗字串
+        // 輔助函式：清洗資料 (去引號、去空白)
         function clean(str) {
-            return str ? String(str).replace(/["']/g, "").trim() : "";
+            if (!str) return "";
+            return String(str).replace(/["']/g, "").trim();
         }
 
         async function fetchData() {
@@ -102,34 +108,88 @@
                 const response = await fetch(GOOGLE_SHEET_API);
                 const rawData = await response.json();
                 
-                categoryMap = { "全部": new Set() };
-
-                // 1. 同步清洗欄位名稱與內容，並建立地圖
+                // 讀取時立即清洗所有關鍵欄位
                 allProducts = rawData.map(item => {
                     const p = {};
                     Object.keys(item).forEach(key => { p[clean(key)] = clean(item[key]); });
-
-                    const mainCat = p.大分類 || "未分類";
-                    if (!categoryMap[mainCat]) categoryMap[mainCat] = new Set();
-
-                    if (p.次分類) {
-                        p.次分類.split(/[，,]/).forEach(s => {
-                            const sClean = clean(s);
-                            if (sClean) {
-                                categoryMap[mainCat].add(sClean);
-                                categoryMap["全部"].add(sClean);
-                            }
-                        });
-                    }
                     return p;
                 });
 
                 renderCategories();
-                renderSubCategories();
+                renderSubCategories(); // IDEA 2 核心：初始計算
                 renderProducts(allProducts);
             } catch (e) {
-                console.error("資料載入出錯", e);
+                console.error("資料載入失敗", e);
             }
+        }
+
+        // --- IDEA 2 核心邏輯：生存過濾 ---
+        function renderSubCategories() {
+            const cloud = document.getElementById('subCategoryCloud');
+            
+            // 1. 取得目前大分類下的「生存產品」
+            const survivalProducts = (activeCategory === '全部') 
+                ? allProducts 
+                : allProducts.filter(p => p.大分類 === activeCategory);
+
+            // 2. 從這些產品中提取現有的次分類
+            const subCatSet = new Set();
+            survivalProducts.forEach(p => {
+                if (p.次分類) {
+                    p.次分類.split(/[，,]/).forEach(s => {
+                        const sClean = clean(s);
+                        if (sClean) subCatSet.add(sClean);
+                    });
+                }
+            });
+
+            const sortedSubCats = Array.from(subCatSet).sort();
+
+            // 3. 渲染按鈕
+            cloud.innerHTML = sortedSubCats.map(s => 
+                `<span onclick="toggleSubCat('${s}')" class="subcat-pill ${activeSubCat === s ? 'active' : ''}">${s}</span>`
+            ).join('');
+
+            // 4. 防呆：如果切換大分類後原本選的次分類不存在，自動取消選取
+            if (activeSubCat && !subCatSet.has(activeSubCat)) {
+                activeSubCat = null;
+                filterData();
+            }
+        }
+
+        function setCategory(cat) {
+            activeCategory = cat;
+            activeSubCat = null; // 切換大分類必清空次分類選取
+            renderCategories();
+            renderSubCategories(); // 重新計算標籤
+            filterData();
+        }
+
+        function toggleSubCat(tag) {
+            activeSubCat = (activeSubCat === tag) ? null : tag;
+            renderSubCategories(); // 更新高亮狀態
+            filterData();
+        }
+
+        function filterData() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = allProducts.filter(p => {
+                const mQ = !query || p.名稱.toLowerCase().includes(query) || p.代碼.toLowerCase().includes(query);
+                const mC = activeCategory === '全部' || p.大分類 === activeCategory;
+                let mS = true;
+                if (activeSubCat) {
+                    const subs = p.次分類 ? p.次分類.split(/[，,]/).map(s => clean(s)) : [];
+                    mS = subs.includes(activeSubCat);
+                }
+                return mQ && mC && mS;
+            });
+            renderProducts(filtered);
+        }
+
+        function renderCategories() {
+            const cats = ['全部', ...new Set(allProducts.map(p => p.大分類).filter(Boolean))];
+            document.getElementById('categoryFilter').innerHTML = cats.map(c => 
+                `<button onclick="setCategory('${c}')" class="px-6 py-2 rounded-full border font-bold whitespace-nowrap ${c === activeCategory ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600'}">${c}</button>`).join('');
         }
 
         function renderProducts(data) {
@@ -142,7 +202,7 @@
                     <div onclick="showDetail('${p.代碼}')" class="cursor-pointer">
                         <div class="flex flex-wrap mb-2 min-h-[24px] pr-24">${p.標籤 ? p.標籤.split(/[，,]/).map(t => `<span class="card-label">${clean(t)}</span>`).join('') : ''}</div>
                         <div class="aspect-square bg-slate-50 rounded-2xl mb-5 flex items-center justify-center p-4">
-                            <img src="${IMAGE_PREFIX}${p.圖片ID}&sz=w600" class="max-h-full transition-transform hover:scale-110">
+                            <img src="${IMAGE_PREFIX}${p.圖片ID}&sz=w600" class="max-h-full transition-transform hover:scale-110" loading="lazy">
                         </div>
                         <div class="text-[10px] font-bold text-blue-600 uppercase mb-1">${p.代碼}</div>
                         <h3 class="text-xl font-black text-slate-900 mb-2 leading-tight">${p.名稱}</h3>
@@ -155,45 +215,7 @@
             }).join('');
         }
 
-        function renderCategories() {
-            const cats = Object.keys(categoryMap);
-            document.getElementById('categoryFilter').innerHTML = cats.map(c => 
-                `<button onclick="setCategory('${c}')" class="px-6 py-2 rounded-full border font-bold whitespace-nowrap ${c === activeCategory ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600'}">${c}</button>`).join('');
-        }
-
-        function renderSubCategories() {
-            const subCatSet = categoryMap[activeCategory] || new Set();
-            const sortedSubCats = Array.from(subCatSet).sort();
-            
-            document.getElementById('subCategoryCloud').innerHTML = sortedSubCats.map(s => 
-                `<span onclick="toggleSubCat('${s}')" class="subcat-pill ${activeSubCat === s ? 'active' : ''}">${s}</span>`
-            ).join('');
-
-            if (activeSubCat && !subCatSet.has(activeSubCat)) {
-                activeSubCat = null;
-                filterData();
-            }
-        }
-
-        function setCategory(cat) { activeCategory = cat; activeSubCat = null; renderCategories(); renderSubCategories(); filterData(); }
-        function toggleSubCat(tag) { activeSubCat = (activeSubCat === tag) ? null : tag; renderSubCategories(); filterData(); }
-
-        function filterData() {
-            const query = document.getElementById('searchInput').value.toLowerCase();
-            const filtered = allProducts.filter(p => {
-                const mQ = !query || p.名稱.toLowerCase().includes(query) || p.代碼.toLowerCase().includes(query);
-                const mC = activeCategory === '全部' || p.大分類 === activeCategory;
-                let mS = true;
-                if (activeSubCat) {
-                    const productSubs = p.次分類 ? p.次分類.split(/[，,]/).map(s => clean(s)) : [];
-                    mS = productSubs.includes(activeSubCat);
-                }
-                return mQ && mC && mS;
-            });
-            renderProducts(filtered);
-        }
-
-        // --- 功能模組：清單、列印、電子郵件 ---
+        // --- 功能功能保留：比較清單、列印、Email ---
 
         function toggleCart(id) { 
             if (cart.has(id)) cart.delete(id); else cart.add(id); 
@@ -202,7 +224,7 @@
         }
 
         function toggleCartModal() {
-            if (cart.size === 0) { alert("比較清單目前是空的"); return; }
+            if (cart.size === 0) { alert("清單是空的"); return; }
             const items = allProducts.filter(p => cart.has(p.代碼));
             document.getElementById('modalContent').innerHTML = `
                 <div class="flex justify-between items-center mb-6">
@@ -238,14 +260,15 @@
                 </tr>`).join('');
 
             document.getElementById('printArea').innerHTML = `
-                <div class="no-print flex justify-between items-center p-4" style="background:#f1f5f9; border-bottom:1px solid #ddd;">
-                    <button onclick="closePrintView()" style="background:#64748b; color:white; padding:10px 20px; border-radius:12px;">← 返回目錄</button>
-                    <div class="flex items-center gap-3 bg-white p-2 rounded-xl">
-                        <button onclick="adjustPrintFont(-1)" class="px-3 border rounded font-bold">A-</button>
-                        <span id="p-indicator" class="font-bold">${printFontSize}px</span>
-                        <button onclick="adjustPrintFont(1)" class="px-3 border rounded font-bold">A+</button>
+                <div class="no-print flex justify-between items-center p-4" style="background:#f1f5f9; border-bottom:1px solid #e2e8f0;">
+                    <button onclick="closePrintView()" class="bg-slate-500 text-white px-6 py-2 rounded-xl font-bold">← 返回目錄</button>
+                    <div class="flex items-center gap-3 bg-white p-2 rounded-xl border">
+                        <span class="text-xs font-bold text-slate-400 px-2">列印字體:</span>
+                        <button onclick="adjustPrintFont(-1)" class="w-8 h-8 border rounded font-bold">A-</button>
+                        <span id="p-indicator" class="font-black text-blue-600">${printFontSize}px</span>
+                        <button onclick="adjustPrintFont(1)" class="w-8 h-8 border rounded font-bold">A+</button>
                     </div>
-                    <button onclick="window.print()" style="background:#2563eb; color:white; padding:10px 20px; border-radius:12px;">執行列印 / 存為 PDF</button>
+                    <button onclick="window.print()" class="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold">執行列印 / PDF</button>
                 </div>
                 <div style="padding: 20px;">
                     <h1 style="text-align:center; font-size:18px; font-weight:900; margin-bottom:10px;">營養補充品產品比較對照表</h1>
@@ -286,27 +309,27 @@
             alert("發送中...");
             try {
                 await fetch(GOOGLE_SHEET_API, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'sendEmail', email: email, tableHtml: tableHtml }) });
-                alert("信件已排程發送。");
+                alert("已送出請求。");
             } catch (e) { alert("發送錯誤"); }
         }
 
         function showDetail(id) {
             const p = allProducts.find(x => x.代碼 === id);
             document.getElementById('modalContent').innerHTML = `
-                <div class="flex flex-col lg:flex-row gap-10">
-                    <div class="lg:w-1/3"><img src="${IMAGE_PREFIX}${p.圖片ID}&sz=w800" class="w-full bg-slate-50 rounded-3xl p-6"></div>
-                    <div class="lg:w-2/3 text-left">
+                <div class="flex flex-col lg:flex-row gap-10 text-left">
+                    <div class="lg:w-1/3"><img src="${IMAGE_PREFIX}${p.圖片ID}&sz=w800" class="w-full bg-slate-50 rounded-3xl p-6 shadow-inner"></div>
+                    <div class="lg:w-2/3">
                         <span class="text-blue-500 font-black text-xs uppercase">${p.代碼} | ${p.大分類}</span>
                         <h2 class="text-3xl font-black text-slate-900 mb-6">${p.名稱}</h2>
                         <div class="p-6 bg-blue-600 text-white rounded-3xl text-lg font-bold mb-6">${p.主要保健效果 || "專業營養補充"}</div>
                         <div class="grid md:grid-cols-2 gap-6 text-sm">
                             <div class="space-y-4">
-                                <div><p class="text-slate-400 font-bold text-[10px]">主要成分</p><p class="font-bold">${p.主要成分}</p></div>
-                                <div><p class="text-slate-400 font-bold text-[10px]">食用方法</p><p class="font-bold">${p.食用方法}</p></div>
+                                <div><p class="text-slate-400 font-bold uppercase text-[10px]">主要成分</p><p class="font-bold text-slate-700">${p.主要成分}</p></div>
+                                <div><p class="text-slate-400 font-bold uppercase text-[10px]">食用方法</p><p class="font-bold text-slate-700">${p.食用方法}</p></div>
                             </div>
                             <div class="space-y-4">
-                                <div class="bg-red-50 p-4 rounded-xl border border-red-100 text-red-700 font-bold"><p class="text-[10px] uppercase">注意事項</p>${p.注意事項}</div>
-                                <div><p class="text-slate-400 font-bold text-[10px]">規格/產地</p><p class="font-bold">${p.內容包裝規格} (${p.原產地})</p></div>
+                                <div class="bg-red-50 p-4 rounded-xl border border-red-100"><p class="text-red-400 font-bold uppercase text-[10px]">注意事項</p><p class="font-bold text-red-700">${p.注意事項}</p></div>
+                                <div><p class="text-slate-400 font-bold uppercase text-[10px]">規格/產地</p><p class="font-bold text-slate-700">${p.內容包裝規格} (${p.原產地})</p></div>
                             </div>
                         </div>
                     </div>
