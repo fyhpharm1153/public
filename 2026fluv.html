@@ -39,8 +39,54 @@
 
     <!-- Main React App -->
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
-        const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } = window.Recharts || Recharts;
+        const { useState, useEffect, useMemo, Component } = React;
+        
+        // 防呆處理：安全取得 Recharts 元件，避免全域變數抓不到導致白畫面
+        const RechartsLib = window.Recharts || window.recharts || {};
+        const { 
+            BarChart = () => <div className="flex items-center justify-center h-full text-slate-400">圖表載入中...</div>, 
+            Bar = () => null, 
+            XAxis = () => null, 
+            YAxis = () => null, 
+            CartesianGrid = () => null, 
+            Tooltip = () => null, 
+            ResponsiveContainer = ({children}) => <div className="w-full h-full">{children}</div>, 
+            Cell = () => null 
+        } = RechartsLib;
+
+        // 錯誤邊界元件（Error Boundary）：若內部渲染發生錯誤，顯示友善提示而非全白畫面
+        class ErrorBoundary extends Component {
+            constructor(props) {
+                super(props);
+                this.state = { hasError: false, error: null };
+            }
+            static getDerivedStateFromError(error) {
+                return { hasError: true, error };
+            }
+            componentDidCatch(error, errorInfo) {
+                console.error("React Error Caught:", error, errorInfo);
+            }
+            render() {
+                if (this.state.hasError) {
+                    return (
+                        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+                            <div className="bg-white p-8 rounded-2xl shadow-xl max-w-lg w-full text-center space-y-4 border border-red-100">
+                                <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">!</div>
+                                <h2 className="text-xl font-bold text-slate-800">系統發生了一點小狀況</h2>
+                                <p className="text-sm text-slate-500">畫面渲染時發生錯誤，請重新整理頁面。若問題持續發生，請檢查主控台 (F12) 錯誤訊息。</p>
+                                <pre className="text-xs bg-slate-100 p-3 rounded-xl text-left overflow-x-auto text-red-600 max-h-32">
+                                    {this.state.error?.toString()}
+                                </pre>
+                                <button onClick={() => window.location.reload()} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl transition">
+                                    重新整理頁面
+                                </button>
+                            </div>
+                        </div>
+                    );
+                }
+                return this.props.children;
+            }
+        }
 
         const DEFAULT_BRANDS = ['GSK', '高端', '東洋', '國光'];
         const BRAND_COLORS = {
@@ -126,6 +172,7 @@
             useEffect(() => {
                 const handleFirebaseLoaded = () => {
                     const mods = window.firebaseAppModules;
+                    if (!mods) return;
                     const app = mods.initializeApp(firebaseConfig);
                     const db = mods.getFirestore(app);
                     const auth = mods.getAuth(app);
@@ -1163,7 +1210,11 @@
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        root.render(
+            <ErrorBoundary>
+                <App />
+            </ErrorBoundary>
+        );
     </script>
 </body>
 </html>
