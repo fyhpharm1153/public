@@ -41,20 +41,11 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, Component } = React;
         
-        // 防呆處理：安全取得 Recharts 元件，避免全域變數抓不到導致白畫面
+        // 安全取得 Recharts 元件
         const RechartsLib = window.Recharts || window.recharts || {};
-        const { 
-            BarChart = () => <div className="flex items-center justify-center h-full text-slate-400">圖表載入中...</div>, 
-            Bar = () => null, 
-            XAxis = () => null, 
-            YAxis = () => null, 
-            CartesianGrid = () => null, 
-            Tooltip = () => null, 
-            ResponsiveContainer = ({children}) => <div className="w-full h-full">{children}</div>, 
-            Cell = () => null 
-        } = RechartsLib;
+        const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } = RechartsLib;
 
-        // 錯誤邊界元件（Error Boundary）：若內部渲染發生錯誤，顯示友善提示而非全白畫面
+        // 錯誤邊界元件
         class ErrorBoundary extends Component {
             constructor(props) {
                 super(props);
@@ -73,7 +64,7 @@
                             <div className="bg-white p-8 rounded-2xl shadow-xl max-w-lg w-full text-center space-y-4 border border-red-100">
                                 <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">!</div>
                                 <h2 className="text-xl font-bold text-slate-800">系統發生了一點小狀況</h2>
-                                <p className="text-sm text-slate-500">畫面渲染時發生錯誤，請重新整理頁面。若問題持續發生，請檢查主控台 (F12) 錯誤訊息。</p>
+                                <p className="text-sm text-slate-500">畫面渲染時發生錯誤，請重新整理頁面。</p>
                                 <pre className="text-xs bg-slate-100 p-3 rounded-xl text-left overflow-x-auto text-red-600 max-h-32">
                                     {this.state.error?.toString()}
                                 </pre>
@@ -90,15 +81,15 @@
 
         const DEFAULT_BRANDS = ['GSK', '高端', '東洋', '國光'];
         const BRAND_COLORS = {
-            'GSK': '#3b82f6',   // 藍色
-            '高端': '#10b981',   // 綠色
-            '東洋': '#f59e0b',   // 黃色/橘色
-            '國光': '#8b5cf6'    // 紫色
+            'GSK': '#3b82f6',
+            '高端': '#10b981',
+            '東洋': '#f59e0b',
+            '國光': '#8b5cf6'
         };
 
         const GROUP_COLORS = {
-            '員工': '#3b82f6',   // 藍色
-            '民眾': '#ec4899'    // 粉紅/桃紅色
+            '員工': '#3b82f6',
+            '民眾': '#ec4899'
         };
 
         const DEFAULT_UNITS = [
@@ -126,6 +117,7 @@
             
             const [brands] = useState(DEFAULT_BRANDS);
             const [units, setUnits] = useState(DEFAULT_UNITS);
+            const [unitsDocs, setUnitsDocs] = useState([]); // 儲存包含 Firestore ID 的單位物件
 
             const [inventoryList, setInventoryList] = useState([]);
             const [records, setRecords] = useState([]);
@@ -214,8 +206,7 @@
                 const unsubInv = mods.onSnapshot(
                     mods.collection(dbInstance, 'artifacts', appId, 'public', 'data', 'inventoryList'),
                     (snapshot) => {
-                        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        setInventoryList(items);
+                        setInventoryList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                     },
                     (err) => console.error("Inventory sync error:", err)
                 );
@@ -223,8 +214,7 @@
                 const unsubRec = mods.onSnapshot(
                     mods.collection(dbInstance, 'artifacts', appId, 'public', 'data', 'records'),
                     (snapshot) => {
-                        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        setRecords(items);
+                        setRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                     },
                     (err) => console.error("Records sync error:", err)
                 );
@@ -232,8 +222,7 @@
                 const unsubRet = mods.onSnapshot(
                     mods.collection(dbInstance, 'artifacts', appId, 'public', 'data', 'returnList'),
                     (snapshot) => {
-                        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        setReturnList(items);
+                        setReturnList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                     },
                     (err) => console.error("Return sync error:", err)
                 );
@@ -241,8 +230,11 @@
                 const unsubUnits = mods.onSnapshot(
                     mods.collection(dbInstance, 'artifacts', appId, 'public', 'data', 'unitsConfig'),
                     (snapshot) => {
-                        const items = snapshot.docs.map(doc => doc.data().name);
-                        if (items.length > 0) setUnits(items);
+                        const docs = snapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+                        setUnitsDocs(docs);
+                        if (docs.length > 0) {
+                            setUnits(docs.map(d => d.name));
+                        }
                     },
                     (err) => console.error("Units sync error:", err)
                 );
@@ -259,7 +251,7 @@
                 setTimeout(() => {
                     if (window.lucide) window.lucide.createIcons();
                 }, 100);
-            }, [activeTab, notification, editingRecord]);
+            }, [activeTab, notification, editingRecord, units]);
 
             const { stockSummary, todaySummary, recordsWithBalance } = useMemo(() => {
                 const summary = {};
@@ -979,20 +971,26 @@
                                         </div>
                                     </div>
 
-                                    <div className="h-80">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={chartData}>
-                                                <CartesianGrid strokeDasharray="3 3" />
-                                                <XAxis dataKey="name" angle={-25} textAnchor="end" height={60} />
-                                                <YAxis />
-                                                <Tooltip />
-                                                <Bar dataKey="支數" radius={[6, 6, 0, 0]}>
-                                                    {chartData.map((entry, index) => (
-                                                        <Cell key={`cell-${index}`} fill={getBarColor(entry)} />
-                                                    ))}
-                                                </Bar>
-                                            </BarChart>
-                                        </ResponsiveContainer>
+                                    <div className="h-80 w-full">
+                                        {chartData.length === 0 ? (
+                                            <div className="h-full flex items-center justify-center text-slate-400 text-sm bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                                                目前篩選條件下尚無施打紀錄可供繪製圖表
+                                            </div>
+                                        ) : (
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 30 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" />
+                                                    <XAxis dataKey="name" angle={-25} textAnchor="end" height={60} interval={0} tick={{ fontSize: 12 }} />
+                                                    <YAxis />
+                                                    <Tooltip />
+                                                    <Bar dataKey="支數" radius={[6, 6, 0, 0]}>
+                                                        {chartData.map((entry, index) => (
+                                                            <Cell key={`cell-${index}`} fill={getBarColor(entry)} />
+                                                        ))}
+                                                    </Bar>
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1114,9 +1112,25 @@
                                     </div>
 
                                     <div className="flex flex-wrap gap-2">
-                                        {units.map(u => (
-                                            <div key={u} className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-xl text-sm font-semibold text-slate-700">
-                                                <span>{u}</span>
+                                        {unitsDocs.map(item => (
+                                            <div key={item.id} className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-xl text-sm font-semibold text-slate-700">
+                                                <span>{item.name}</span>
+                                                <button 
+                                                    onClick={async () => {
+                                                        const mods = window.firebaseAppModules;
+                                                        try {
+                                                            await mods.deleteDoc(mods.doc(dbInstance, 'artifacts', appId, 'public', 'data', 'unitsConfig', item.id));
+                                                            showAlert(`已刪除單位: ${item.name}`);
+                                                        } catch (err) {
+                                                            console.error(err);
+                                                            showAlert('刪除失敗');
+                                                        }
+                                                    }}
+                                                    className="text-red-500 hover:text-red-700 text-xs font-bold ml-1"
+                                                    title="刪除單位"
+                                                >
+                                                    ✕
+                                                </button>
                                             </div>
                                         ))}
                                     </div>
