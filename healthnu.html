@@ -370,7 +370,6 @@
                     </td>
                     <td>${p.主要成分}</td>
                     <td>${p.食用方法}</td>
-                    <td>${p.適合對象 || p.適用對象}</td>
                     <td>${p.內容包裝規格}</td>
                 </tr>`).join('');
 
@@ -389,7 +388,7 @@
                     <h1 style="text-align:center; font-size:18px; font-weight:900; margin-bottom:10px;">營養補充品產品比較對照表</h1>
                     <table class="print-table" style="width:100%; border-collapse:collapse;">
                         <thead style="background:#f8fafc">
-                            <tr><th>品名/代碼</th><th>價格${isStaffUnlocked ? '(民/員)' : ''}</th><th>主要成分</th><th>用法</th><th>對象</th><th>規格</th></tr>
+                            <tr><th>品名/代碼</th><th>價格${isStaffUnlocked ? '(民/員)' : ''}</th><th>主要成分</th><th>用法</th><th>規格</th></tr>
                         </thead>
                         <tbody style="font-size: var(--print-font-size);">${tableRows}</tbody>
                     </table>
@@ -437,16 +436,16 @@
             // 生成給郵件用的表格內容 (對應 GS 的 4 個標題)
             const tableHtml = items.map(p => `
                 <tr style="border-bottom: 1px solid #eee;">
-                    <td style="padding:12px; border:1px solid #ddd; width:25%;"><b>${p.代碼}</b><br>${p.名稱}</td>
-                    <td style="padding:12px; border:1px solid #ddd; font-size:12px; width:35%;">
+                    <td style="padding:12px; border:1px solid #ddd; width:35%;">
+                        <b>${p.代碼}</b><br>${p.名稱}
+                        ${p.圖片ID ? `<div style="margin-top:8px;"><img src="${IMAGE_PREFIX}${p.圖片ID}&sz=w300" alt="${p.名稱}" style="max-width:90px; max-height:90px; border-radius:8px; border:1px solid #eee; display:block;"></div>` : ''}
+                    </td>
+                    <td style="padding:12px; border:1px solid #ddd; font-size:12px; width:45%;">
                         <div style="margin-bottom:6px;"><b>成分：</b>${p.主要成分}</div>
                         <div><b>用法：</b>${p.食用方法}</div>
                     </td>
                     <td style="padding:12px; border:1px solid #ddd; font-size:12px; width:20%; text-align:center;">
                         ${p.內容包裝規格}
-                    </td>
-                    <td style="padding:12px; border:1px solid #ddd; font-size:12px; width:20%;">
-                        ${p.適合對象 || p.適用對象 || "一般大眾"}
                     </td>
                 </tr>`).join('');
 
