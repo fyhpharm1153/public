@@ -37,7 +37,6 @@
     </style>
 </head>
 <body class="text-slate-800">
-
     <div id="mainApp" class="no-print">
         <nav class="glass-nav sticky top-0 z-50 px-4 py-3 bg-white/80 backdrop-blur-md border-b">
             <div class="max-w-7xl mx-auto flex justify-between items-center">
@@ -46,6 +45,13 @@
                     <h1 class="text-xl font-black text-slate-900 tracking-tighter">保健營養品目錄</h1>
                 </div>
                 <div class="flex items-center gap-2">
+                    <!-- 鎖頭按鈕：位於 A+ 左邊 -->
+                    <button id="lockBtn" onclick="handleLockClick()" class="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 rounded-xl transition hover:bg-slate-50 active:scale-95" title="驗證" aria-label="驗證">
+                        <svg id="lockIcon" class="w-5 h-5 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <!-- 預設閉鎖狀態圖示 -->
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                    </button>
                     <button onclick="adjustFont(2)" class="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 rounded-xl font-bold">A+</button>
                     <button onclick="adjustFont(-2)" class="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 rounded-xl font-bold">A-</button>
                 </div>
@@ -55,9 +61,7 @@
         <main class="max-w-7xl mx-auto p-4 md:p-8">
             <div class="mb-8 space-y-4">
                 <input type="text" id="searchInput" oninput="filterData()" placeholder="搜尋品名、代碼、功效、關鍵字..." class="w-full p-5 rounded-2xl border-2 border-white bg-white shadow-xl focus:border-blue-500 focus:outline-none text-lg">
-                
                 <div id="categoryFilter" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
-                
                 <div class="bg-white/60 p-5 rounded-2xl border border-white shadow-sm">
                     <p class="text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest">第二層：次分類篩選</p>
                     <div id="subCategoryCloud" class="flex flex-wrap gap-2"></div>
@@ -75,6 +79,41 @@
         </div>
     </div>
 
+    <!-- 驗證密碼輸入彈窗（中性文字，不透露任何員眷價字眼） -->
+    <div id="authModal" class="fixed inset-0 z-[110] hidden flex items-center justify-center p-4 no-print">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeAuthModal()"></div>
+        <div class="bg-white w-full max-w-sm rounded-3xl relative z-10 p-6 md:p-8 shadow-2xl text-center">
+            <div class="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                </svg>
+            </div>
+            <h3 class="text-lg font-bold text-slate-800 mb-1">代碼驗證</h3>
+            <p class="text-xs text-slate-400 mb-5">請輸入通行驗證碼</p>
+            <input type="password" id="authCodeInput" inputmode="numeric" placeholder="請輸入代碼" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-center text-lg tracking-widest font-mono focus:border-blue-500 focus:outline-none mb-3" onkeydown="if(event.key==='Enter') submitAuthCode()">
+            <p id="authErrorMsg" class="text-xs text-red-500 min-h-[1.25rem] mb-3"></p>
+            <div class="grid grid-cols-2 gap-3">
+                <button type="button" onclick="closeAuthModal()" class="py-2.5 px-4 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50">取消</button>
+                <button type="button" onclick="submitAuthCode()" class="py-2.5 px-4 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 shadow-md">確認</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 信箱發送輸入彈窗 -->
+    <div id="emailModal" class="fixed inset-0 z-[110] hidden flex items-center justify-center p-4 no-print">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeEmailModal()"></div>
+        <div class="bg-white w-full max-w-sm rounded-3xl relative z-10 p-6 md:p-8 shadow-2xl text-center">
+            <h3 class="text-lg font-bold text-slate-800 mb-1">發送對照清單</h3>
+            <p class="text-xs text-slate-400 mb-4">請輸入收件人電子信箱</p>
+            <input type="email" id="emailInput" placeholder="name@example.com" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-center text-base focus:border-blue-500 focus:outline-none mb-3" onkeydown="if(event.key==='Enter') confirmSendEmail()">
+            <p id="emailErrorMsg" class="text-xs text-red-500 min-h-[1.25rem] mb-3"></p>
+            <div class="grid grid-cols-2 gap-3">
+                <button type="button" onclick="closeEmailModal()" class="py-2.5 px-4 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50">取消</button>
+                <button type="button" onclick="confirmSendEmail()" class="py-2.5 px-4 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 shadow-md">發送</button>
+            </div>
+        </div>
+    </div>
+
     <div id="modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-4 no-print">
         <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeModal()"></div>
         <div id="modalWindow" class="bg-white w-full max-w-4xl max-h-[90vh] rounded-[2.5rem] relative z-10 overflow-y-auto p-6 md:p-10 shadow-2xl">
@@ -83,6 +122,9 @@
     </div>
 
     <div id="printArea" class="hidden bg-white min-h-screen"></div>
+
+    <!-- 浮動提示 Toast -->
+    <div id="toast" class="fixed top-6 left-1/2 -translate-x-1/2 z-[150] hidden px-5 py-3 rounded-2xl bg-slate-900 text-white text-sm font-bold shadow-2xl transition-all"></div>
 
     <script>
         const GOOGLE_SHEET_API = "https://script.google.com/macros/s/AKfycby9FT_rCftaktAW_JIF2wzEbrsRXo6aHvJKvpnp3RM5iR3D8xUQRSRgWmkloivVbFEG/exec"; 
@@ -94,6 +136,18 @@
         let cart = new Set();
         let currentFontSize = 16;
         let printFontSize = 11;
+        let isStaffUnlocked = false; // 是否已解鎖顯示員眷價
+
+        // 訊息提示元件 (取代 alert)
+        function showToast(msg, duration = 2500) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.classList.remove('hidden');
+            clearTimeout(window._toastTimer);
+            window._toastTimer = setTimeout(() => {
+                toast.classList.add('hidden');
+            }, duration);
+        }
 
         // 深度清洗：處理 CSV 匯入的引號與空白
         function clean(str) {
@@ -120,6 +174,62 @@
                 filterData();
             } catch (e) {
                 console.error("資料載入失敗", e);
+            }
+        }
+
+        // 處理鎖頭按鈕點擊
+        function handleLockClick() {
+            if (isStaffUnlocked) {
+                // 若已解鎖，點擊則再次鎖定
+                isStaffUnlocked = false;
+                updateLockUI();
+                filterData();
+                showToast("已鎖定");
+            } else {
+                // 未解鎖，打開驗證彈窗
+                document.getElementById('authCodeInput').value = '';
+                document.getElementById('authErrorMsg').innerText = '';
+                document.getElementById('authModal').classList.remove('hidden');
+                setTimeout(() => {
+                    document.getElementById('authCodeInput').focus();
+                }, 100);
+            }
+        }
+
+        function closeAuthModal() {
+            document.getElementById('authModal').classList.add('hidden');
+        }
+
+        const AUTH_PASSCODE = "11531153";
+
+        function submitAuthCode() {
+            const inputVal = document.getElementById('authCodeInput').value.trim();
+            if (inputVal === AUTH_PASSCODE) {
+                isStaffUnlocked = true;
+                updateLockUI();
+                closeAuthModal();
+                filterData();
+                showToast("驗證完成");
+            } else {
+                document.getElementById('authErrorMsg').innerText = '代碼錯誤，請重新輸入';
+            }
+        }
+
+        function updateLockUI() {
+            const lockIcon = document.getElementById('lockIcon');
+            const lockBtn = document.getElementById('lockBtn');
+            if (isStaffUnlocked) {
+                // 解鎖狀態：更換為開鎖圖示與藍色樣式
+                lockIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/>`;
+                lockIcon.classList.remove('text-slate-700');
+                lockIcon.classList.add('text-blue-600');
+                lockBtn.classList.add('border-blue-400', 'bg-blue-50/50');
+            } else {
+                // 閉鎖狀態：還原為閉鎖圖示
+                lockIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>`;
+                lockIcon.classList.remove('text-blue-600');
+                lockIcon.classList.add('text-slate-700');
+                lockBtn.classList.remove('border-blue-400', 'bg-blue-50/50');
             }
         }
 
@@ -214,7 +324,7 @@
                         <h3 class="text-xl font-black text-slate-900 mb-2 leading-tight">${p.名稱}</h3>
                         <div class="mt-4 border-t pt-4 flex justify-between items-end">
                             <div><p class="text-[10px] text-slate-400 font-bold">民眾價</p><p class="text-xl font-black text-blue-600">$${p.民眾價}</p></div>
-                            <div class="text-right"><p class="text-[10px] text-red-400 font-bold">員眷價</p><p class="text-xl font-black text-red-600">$${p.員眷價}</p></div>
+                            ${isStaffUnlocked ? `<div class="text-right"><p class="text-[10px] text-red-400 font-bold">員眷價</p><p class="text-xl font-black text-red-600">$${p.員眷價}</p></div>` : ''}
                         </div>
                     </div>
                 </div>`;
@@ -222,7 +332,6 @@
         }
 
         // --- 功能模組：清單、列印、Email ---
-
         function toggleCart(id) { 
             if (cart.has(id)) cart.delete(id); else cart.add(id); 
             document.getElementById('cartCount').innerText = cart.size; 
@@ -230,7 +339,7 @@
         }
 
         function toggleCartModal() {
-            if (cart.size === 0) { alert("目前清單是空的"); return; }
+            if (cart.size === 0) { showToast("目前清單是空的"); return; }
             const items = allProducts.filter(p => cart.has(p.代碼));
             document.getElementById('modalContent').innerHTML = `
                 <div class="flex justify-between items-center mb-6">
@@ -242,7 +351,7 @@
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <button onclick="generatePrintView()" class="bg-blue-600 text-white py-4 rounded-2xl font-black shadow-lg">產生 A4 對照表</button>
-                    <button onclick="sendEmailAction()" class="bg-slate-900 text-white py-4 rounded-2xl font-black shadow-lg">發送信件</button>
+                    <button onclick="openEmailModal()" class="bg-slate-900 text-white py-4 rounded-2xl font-black shadow-lg">發送信件</button>
                 </div>`;
             document.getElementById('modal').classList.remove('hidden');
         }
@@ -257,7 +366,7 @@
                     </td>
                     <td style="text-align:center;">
                         <div style="color:#2563eb; font-weight:bold;">$${p.民眾價}</div>
-                        <div style="color:#dc2626; font-weight:bold;">$${p.員眷價}</div>
+                        ${isStaffUnlocked ? `<div style="color:#dc2626; font-weight:bold;">$${p.員眷價}</div>` : ''}
                     </td>
                     <td>${p.主要成分}</td>
                     <td>${p.食用方法}</td>
@@ -280,7 +389,7 @@
                     <h1 style="text-align:center; font-size:18px; font-weight:900; margin-bottom:10px;">營養補充品產品比較對照表</h1>
                     <table class="print-table" style="width:100%; border-collapse:collapse;">
                         <thead style="background:#f8fafc">
-                            <tr><th>品名/代碼</th><th>價格(民/員)</th><th>主要成分</th><th>用法</th><th>對象</th><th>規格</th></tr>
+                            <tr><th>品名/代碼</th><th>價格${isStaffUnlocked ? '(民/員)' : ''}</th><th>主要成分</th><th>用法</th><th>對象</th><th>規格</th></tr>
                         </thead>
                         <tbody style="font-size: var(--print-font-size);">${tableRows}</tbody>
                     </table>
@@ -301,42 +410,58 @@
             document.getElementById('p-indicator').innerText = printFontSize + 'px';
         }
 
-async function sendEmailAction() {
-    const email = prompt("請輸入收件人信箱：");
-    if (!email || !email.includes('@')) { alert("信箱格式不正確"); return; }
+        function openEmailModal() {
+            document.getElementById('emailInput').value = '';
+            document.getElementById('emailErrorMsg').innerText = '';
+            document.getElementById('emailModal').classList.remove('hidden');
+            setTimeout(() => {
+                document.getElementById('emailInput').focus();
+            }, 100);
+        }
 
-    const items = allProducts.filter(p => cart.has(p.代碼));
-    
-    // 生成給郵件用的表格內容 (對應 GS 的 4 個標題)
-    const tableHtml = items.map(p => `
-        <tr style="border-bottom: 1px solid #eee;">
-            <td style="padding:12px; border:1px solid #ddd; width:25%;"><b>${p.代碼}</b><br>${p.名稱}</td>
-            <td style="padding:12px; border:1px solid #ddd; font-size:12px; width:35%;">
-                <div style="margin-bottom:6px;"><b>成分：</b>${p.主要成分}</div>
-                <div><b>用法：</b>${p.食用方法}</div>
-            </td>
-            <td style="padding:12px; border:1px solid #ddd; font-size:12px; width:20%; text-align:center;">
-                ${p.內容包裝規格}
-            </td>
-            <td style="padding:12px; border:1px solid #ddd; font-size:12px; width:20%;">
-                ${p.適合對象 || p.適用對象 || "一般大眾"}
-            </td>
-        </tr>`).join('');
-    
-    alert("已傳送信件...");
+        function closeEmailModal() {
+            document.getElementById('emailModal').classList.add('hidden');
+        }
 
-    try {
-        await fetch(GOOGLE_SHEET_API, { 
-            method: 'POST', 
-            mode: 'no-cors', // 避開 CORS 限制
-            headers: { 'Content-Type': 'text/plain' }, // 使用 text/plain 最保險
-            body: JSON.stringify({ action: 'sendEmail', email: email, tableHtml: tableHtml }) 
-        });
-        alert("請確認收件匣（若沒收到請檢查垃圾郵件）。");
-    } catch (e) { 
-        alert("網路錯誤，請稍後再試"); 
-    }
-}
+        async function confirmSendEmail() {
+            const email = document.getElementById('emailInput').value.trim();
+            if (!email || !email.includes('@')) {
+                document.getElementById('emailErrorMsg').innerText = '請輸入正確的信箱格式';
+                return;
+            }
+
+            closeEmailModal();
+            showToast("正在傳送信件...");
+
+            const items = allProducts.filter(p => cart.has(p.代碼));
+            // 生成給郵件用的表格內容 (對應 GS 的 4 個標題)
+            const tableHtml = items.map(p => `
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding:12px; border:1px solid #ddd; width:25%;"><b>${p.代碼}</b><br>${p.名稱}</td>
+                    <td style="padding:12px; border:1px solid #ddd; font-size:12px; width:35%;">
+                        <div style="margin-bottom:6px;"><b>成分：</b>${p.主要成分}</div>
+                        <div><b>用法：</b>${p.食用方法}</div>
+                    </td>
+                    <td style="padding:12px; border:1px solid #ddd; font-size:12px; width:20%; text-align:center;">
+                        ${p.內容包裝規格}
+                    </td>
+                    <td style="padding:12px; border:1px solid #ddd; font-size:12px; width:20%;">
+                        ${p.適合對象 || p.適用對象 || "一般大眾"}
+                    </td>
+                </tr>`).join('');
+
+            try {
+                await fetch(GOOGLE_SHEET_API, { 
+                    method: 'POST', 
+                    mode: 'no-cors', // 避開 CORS 限制
+                    headers: { 'Content-Type': 'text/plain' }, // 使用 text/plain 最保險
+                    body: JSON.stringify({ action: 'sendEmail', email: email, tableHtml: tableHtml }) 
+                });
+                showToast("已發送信件，請確認收件匣或垃圾郵件。");
+            } catch (e) { 
+                showToast("網路錯誤，請稍後再試"); 
+            }
+        }
 
         function showDetail(id) {
             const p = allProducts.find(x => x.代碼 === id);
